@@ -41,6 +41,12 @@ class SimpleImageProcessor {
         });
     }
 
+    // Utility function to clamp similarity values
+    clampSimilarity(value) {
+        if (typeof value !== 'number' || isNaN(value)) return 0;
+        return Math.max(0, Math.min(1.0, parseFloat(value.toFixed(10))));
+    }
+
     async generateHash(imagePath) {
         try {
             return await this.runPythonScript('generate_hash', [imagePath]);
@@ -63,33 +69,49 @@ class SimpleImageProcessor {
 
     async searchSimilar(imagePath, threshold = 0.8) {
         try {
-            return await this.runPythonScript('search_similar', [
+            const result = await this.runPythonScript('search_similar', [
                 imagePath,
                 threshold.toString()
             ]);
+
+            // Clamp all similarity values to prevent floating point precision issues
+            if (result.success && result.matches) {
+                result.matches = result.matches.map(match => ({
+                    ...match,
+                    similarity_score: this.clampSimilarity(match.similarity_score)
+                }));
+
+                if (result.highest_similarity) {
+                    result.highest_similarity = this.clampSimilarity(result.highest_similarity);
+                }
+            }
+
+            return result;
         } catch (error) {
             throw new Error(`Similarity search failed: ${error.message}`);
         }
     }
 
     calculateTamperScore(similarityScore) {
-        const originalityPercentage = Math.min(100, Math.round(similarityScore * 100));
+        // Ensure similarity score is properly clamped
+        const clampedScore = this.clampSimilarity(similarityScore);
+        const originalityPercentage = Math.min(100, Math.round(clampedScore * 100));
 
         let tamperLevel, colorCode, confidence;
 
-        if (similarityScore >= 0.95) {
+        if (clampedScore >= 0.95) {
             tamperLevel = "No tampering detected";
             colorCode = "green";
             confidence = "very_high";
-        } else if (similarityScore >= 0.85) {
+        } else if (clampedScore >= 0.85) {
             tamperLevel = "Minor modifications";
             colorCode = "green";
             confidence = "high";
-        } else if (similarityScore >= 0.70) {
+        } else if (clampedScore >= 0.70) {
             tamperLevel = "Moderate tampering";
             colorCode = "yellow";
             confidence = "medium";
-        } else if (similarityScore >= 0.50) {
+        } else if (clampedScore >= 0.50) {
             tamperLevel = "Significant tampering";
             colorCode = "orange";
             confidence = "medium";
@@ -104,7 +126,7 @@ class SimpleImageProcessor {
             tamperLevel,
             colorCode,
             confidence,
-            similarityScore: parseFloat(similarityScore.toFixed(4))
+            similarityScore: clampedScore
         };
     }
 }

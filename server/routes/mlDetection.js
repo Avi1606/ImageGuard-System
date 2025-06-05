@@ -9,6 +9,12 @@ const router = express.Router();
 const upload = multer({ dest: 'temp/' });
 const processor = new SimpleImageProcessor();
 
+// Utility function to clamp values between 0 and 1
+const clampSimilarity = (value) => {
+    if (typeof value !== 'number' || isNaN(value)) return 0;
+    return Math.max(0, Math.min(1.0, value));
+};
+
 // Test Python integration
 router.get('/test', async (req, res) => {
     try {
@@ -91,33 +97,6 @@ router.post('/add-to-index/:imageId', auth, async (req, res) => {
     }
 });
 
-// Get ML index status
-router.get('/index-status', auth, async (req, res) => {
-    try {
-        const totalImages = await Image.countDocuments({ owner: req.user.id });
-        const indexedImages = await Image.countDocuments({
-            owner: req.user.id,
-            'mlIndex.isIndexed': true
-        });
-
-        res.json({
-            success: true,
-            stats: {
-                totalImages,
-                indexedImages,
-                notIndexed: totalImages - indexedImages,
-                indexingPercentage: totalImages > 0 ? Math.round((indexedImages / totalImages) * 100) : 0
-            }
-        });
-    } catch (error) {
-        console.error('Index status error:', error);
-        res.status(500).json({
-            error: 'Failed to get index status',
-            details: error.message
-        });
-    }
-});
-
 // ML-based similarity detection
 router.post('/ml-detect', auth, upload.single('image'), async (req, res) => {
     try {
@@ -145,19 +124,23 @@ router.post('/ml-detect', auth, upload.single('image'), async (req, res) => {
 
         console.log('Search completed, matches found:', searchResults.total_matches);
 
-        // Process results and calculate tamper scores
+        // Process results and calculate tamper scores with clamped values
         const processedResults = searchResults.matches.map(match => {
-            const tamperScore = processor.calculateTamperScore(match.similarity_score);
+            const clampedSimilarity = clampSimilarity(match.similarity_score);
+            const tamperScore = processor.calculateTamperScore(clampedSimilarity);
             return {
                 ...match,
+                similarity_score: clampedSimilarity,
                 tamperScore
             };
         });
 
+        // Clamp the highest similarity value
+        const highestSimilarity = clampSimilarity(searchResults.highest_similarity || 0);
+
         // Determine verdict based on results
         let verdict = 'no_match';
         if (searchResults.total_matches > 0) {
-            const highestSimilarity = searchResults.highest_similarity;
             if (highestSimilarity >= 0.95) {
                 verdict = 'original';
             } else if (highestSimilarity >= 0.85) {
@@ -169,7 +152,9 @@ router.post('/ml-detect', auth, upload.single('image'), async (req, res) => {
             }
         }
 
-        // Create detection log
+        console.log('Detection verdict:', verdict, 'Similarity:', highestSimilarity);
+
+        // Create detection log with clamped values
         const detectionLog = new DetectionLog({
             suspectedImage: {
                 filename: req.file.originalname || req.file.filename,
@@ -179,8 +164,8 @@ router.post('/ml-detect', auth, upload.single('image'), async (req, res) => {
                 }
             },
             detectionResults: {
-                similarity: searchResults.highest_similarity || 0,
-                confidence: searchResults.highest_similarity || 0,
+                similarity: highestSimilarity,
+                confidence: highestSimilarity,
                 verdict: verdict
             },
             analysis: {
@@ -196,7 +181,9 @@ router.post('/ml-detect', auth, upload.single('image'), async (req, res) => {
             status: 'completed'
         });
 
+        console.log('Saving detection log...');
         await detectionLog.save();
+        console.log('Detection log saved successfully');
 
         // Clean up temp file
         const fs = require('fs');
@@ -210,7 +197,7 @@ router.post('/ml-detect', auth, upload.single('image'), async (req, res) => {
             success: true,
             results: {
                 totalMatches: searchResults.total_matches,
-                highestSimilarity: searchResults.highest_similarity || 0,
+                highestSimilarity: highestSimilarity,
                 matches: processedResults,
                 overallTamperScore: processedResults.length > 0
                     ? processedResults[0].tamperScore
@@ -236,6 +223,33 @@ router.post('/ml-detect', auth, upload.single('image'), async (req, res) => {
 
         res.status(500).json({
             error: 'ML detection failed',
+            details: error.message
+        });
+    }
+});
+
+// Get ML index status
+router.get('/index-status', auth, async (req, res) => {
+    try {
+        const totalImages = await Image.countDocuments({ owner: req.user.id });
+        const indexedImages = await Image.countDocuments({
+            owner: req.user.id,
+            'mlIndex.isIndexed': true
+        });
+
+        res.json({
+            success: true,
+            stats: {
+                totalImages,
+                indexedImages,
+                notIndexed: totalImages - indexedImages,
+                indexingPercentage: totalImages > 0 ? Math.round((indexedImages / totalImages) * 100) : 0
+            }
+        });
+    } catch (error) {
+        console.error('Index status error:', error);
+        res.status(500).json({
+            error: 'Failed to get index status',
             details: error.message
         });
     }
