@@ -1,15 +1,20 @@
 const mongoose = require('mongoose');
 
 const imageSchema = new mongoose.Schema({
-  filename: {
-    type: String,
-    required: true
-  },
   originalName: {
     type: String,
     required: true
   },
+  filename: {
+    type: String,
+    required: true,
+    unique: true
+  },
   path: {
+    type: String,
+    required: true
+  },
+  mimetype: {
     type: String,
     required: true
   },
@@ -17,18 +22,17 @@ const imageSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
-  mimetype: {
-    type: String,
-    required: true
-  },
   dimensions: {
     width: Number,
     height: Number
   },
-  owner: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+  hash: {
+    perceptualHash: String,
+    differenceHash: String,
+    averageHash: String,
+    md5Hash: String,
+    mlHash: String,
+    cnnHash: [Number]
   },
   watermark: {
     isWatermarked: {
@@ -43,68 +47,62 @@ const imageSchema = new mongoose.Schema({
     },
     opacity: {
       type: Number,
-      default: 0.3,
       min: 0.1,
-      max: 1.0
+      max: 1.0,
+      default: 0.3
     },
     watermarkedPath: String
   },
-  hash: {
-    perceptualHash: String,
-    dhash: String,
-    ahash: String,
-    phash: String
-  },
-  metadata: {
-    exif: mongoose.Schema.Types.Mixed,
-    colorProfile: String,
-    format: String
-  },
-  protection: {
-    level: {
-      type: String,
-      enum: ['basic', 'standard', 'premium'],
-      default: 'basic'
-    },
-    features: [{
-      type: String,
-      enum: ['watermark', 'hash', 'metadata', 'invisible-watermark']
-    }]
-  },
   status: {
     type: String,
-    enum: ['uploaded', 'processing', 'protected', 'error'],
+    enum: [
+      'uploaded',     // Just uploaded
+      'processing',   // Being processed
+      'indexed',      // Added to ML search index
+      'protected',    // Has watermark
+      'archived',     // Archived
+      'failed'        // Processing failed
+    ],
     default: 'uploaded'
   },
-  downloads: {
-    type: Number,
-    default: 0
+  owner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
   },
-  views: {
-    type: Number,
-    default: 0
+  metadata: {
+    camera: String,
+    location: String,
+    description: String,
+    tags: [String]
   },
-  isPublic: {
-    type: Boolean,
-    default: false
+  analytics: {
+    views: {
+      type: Number,
+      default: 0
+    },
+    downloads: {
+      type: Number,
+      default: 0
+    },
+    lastAccessed: Date
   },
-  tags: [String],
-  description: String,
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
+  mlIndex: {
+    isIndexed: {
+      type: Boolean,
+      default: false
+    },
+    indexedAt: Date,
+    features: [Number], // ML feature vector
+    searchableHash: String
   }
 }, {
   timestamps: true
 });
 
-// Index for efficient querying
-imageSchema.index({ owner: 1, createdAt: -1 });
-imageSchema.index({ 'hash.perceptualHash': 1 });
-imageSchema.index({ filename: 1 });
+// Index for faster queries
+imageSchema.index({ owner: 1, status: 1 });
+imageSchema.index({ filename: 1 }, { unique: true });
+imageSchema.index({ 'mlIndex.isIndexed': 1 });
 
 module.exports = mongoose.model('Image', imageSchema);

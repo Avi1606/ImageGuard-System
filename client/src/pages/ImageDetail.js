@@ -20,7 +20,6 @@ const ImageDetail = () => {
     const [image, setImage] = useState(null);
     const [loading, setLoading] = useState(true);
     const [indexing, setIndexing] = useState(false);
-    const [isIndexed, setIsIndexed] = useState(false);
 
     useEffect(() => {
         fetchImage();
@@ -30,11 +29,9 @@ const ImageDetail = () => {
         try {
             const response = await axios.get(`/api/images/${id}`);
             setImage(response.data.image);
-
-            // Check if image is already indexed
-            setIsIndexed(response.data.image.status === 'indexed');
         } catch (error) {
             console.error('Error fetching image:', error);
+            toast.error('Failed to load image');
         } finally {
             setLoading(false);
         }
@@ -48,13 +45,19 @@ const ImageDetail = () => {
             const response = await axios.post(`/api/ml-detection/add-to-index/${image._id}`);
 
             if (response.data.success) {
-                toast.success(response.data.message);
-                setIsIndexed(true);
-                setImage(prev => ({ ...prev, status: 'indexed' }));
+                if (response.data.alreadyIndexed) {
+                    toast.info('Image was already in ML index');
+                } else {
+                    toast.success('Image added to ML index successfully!');
+                }
+
+                // Refresh image data
+                await fetchImage();
             }
         } catch (error) {
             console.error('Error adding to index:', error);
-            toast.error(error.response?.data?.details || 'Failed to add to ML index');
+            const errorMessage = error.response?.data?.details || error.response?.data?.error || 'Failed to add to ML index';
+            toast.error(errorMessage);
         } finally {
             setIndexing(false);
         }
@@ -76,6 +79,8 @@ const ImageDetail = () => {
             </div>
         );
     }
+
+    const isIndexed = image.mlIndex?.isIndexed || image.status === 'indexed';
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -143,6 +148,14 @@ const ImageDetail = () => {
                     {new Date(image.createdAt).toLocaleDateString()}
                   </span>
                                 </div>
+                                {isIndexed && image.mlIndex?.indexedAt && (
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-600">Indexed:</span>
+                                        <span className="text-gray-900">
+                      {new Date(image.mlIndex.indexedAt).toLocaleDateString()}
+                    </span>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -154,14 +167,22 @@ const ImageDetail = () => {
                             </h3>
 
                             {isIndexed ? (
-                                <div className="flex items-center space-x-3 p-4 bg-green-50 rounded-lg border border-green-200">
-                                    <CheckCircle className="h-6 w-6 text-green-600" />
-                                    <div>
-                                        <p className="font-medium text-green-800">Indexed for Detection</p>
-                                        <p className="text-sm text-green-600">
-                                            This image is in the ML search index and can be detected if copied
-                                        </p>
+                                <div className="space-y-3">
+                                    <div className="flex items-center space-x-3 p-4 bg-green-50 rounded-lg border border-green-200">
+                                        <CheckCircle className="h-6 w-6 text-green-600 flex-shrink-0" />
+                                        <div>
+                                            <p className="font-medium text-green-800">Successfully Indexed</p>
+                                            <p className="text-sm text-green-600">
+                                                This image is in the ML search index and can be detected if copied
+                                            </p>
+                                        </div>
                                     </div>
+
+                                    {image.mlIndex?.searchableHash && (
+                                        <div className="text-xs text-gray-500">
+                                            <p>Hash: <span className="font-mono">{image.mlIndex.searchableHash.substring(0, 16)}...</span></p>
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="space-y-3">
@@ -236,14 +257,14 @@ const ImageDetail = () => {
                                         <Eye className="h-5 w-5 text-gray-400 mr-2" />
                                         <span className="text-gray-600">Views:</span>
                                     </div>
-                                    <span className="text-gray-900 font-medium">{image.views || 0}</span>
+                                    <span className="text-gray-900 font-medium">{image.analytics?.views || 0}</span>
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center">
                                         <Download className="h-5 w-5 text-gray-400 mr-2" />
                                         <span className="text-gray-600">Downloads:</span>
                                     </div>
-                                    <span className="text-gray-900 font-medium">{image.downloads || 0}</span>
+                                    <span className="text-gray-900 font-medium">{image.analytics?.downloads || 0}</span>
                                 </div>
                             </div>
                         </div>
