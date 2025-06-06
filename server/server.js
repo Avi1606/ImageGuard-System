@@ -18,7 +18,7 @@ app.use(helmet());
 app.use(cors({
   origin: [
     process.env.CLIENT_URL,
-    'https://your-vercel-app.vercel.app', // Replace with your actual Vercel URL
+    'https://imageguard-avi1606.vercel.app', // Replace with your actual Vercel URL
     'http://localhost:3000' // Keep for development
   ],
   credentials: true
@@ -38,18 +38,39 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // Static files
 app.use('/uploads', express.static('uploads'));
 
-// Database connection
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
+// Database connection function
+const connectDB = async () => {
+  try {
+    console.log('🔗 Attempting to connect to MongoDB...');
+
+    // Remove deprecated options - modern MongoDB driver doesn't need them
+    await mongoose.connect(process.env.MONGODB_URI);
+
+    console.log('✅ Connected to MongoDB');
+  } catch (error) {
+    console.error('❌ MongoDB connection error:', error.message);
+    console.log('Full error:', error);
+
+    // Retry connection after 5 seconds
+    setTimeout(connectDB, 5000);
+  }
+};
+
+// Connect to database
+connectDB();
+
+// MongoDB connection event listeners
+mongoose.connection.on('disconnected', () => {
+  console.log('❌ MongoDB disconnected. Attempting to reconnect...');
 });
 
-mongoose.connection.on('connected', () => {
-  console.log('✅ Connected to MongoDB');
+mongoose.connection.on('reconnected', () => {
+  console.log('✅ MongoDB reconnected');
 });
 
+// Handle connection errors after initial connection
 mongoose.connection.on('error', (err) => {
-  console.error('❌ MongoDB connection error:', err);
+  console.error('❌ MongoDB connection error:', err.message);
 });
 
 // Routes
@@ -64,7 +85,8 @@ app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    python_available: true
+    python_available: true,
+    mongodb_status: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
   });
 });
 
@@ -103,10 +125,44 @@ app.use('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => {
+
+// Improved server startup with error handling
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log('🧠 Python ML integration enabled');
   console.log(`🔗 Test Python: http://localhost:${PORT}/test-python`);
+});
+
+// Handle server errors (like port already in use)
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`❌ Port ${PORT} is already in use`);
+    console.log('💡 Try these commands to fix:');
+    console.log(`   netstat -ano | findstr :${PORT}`);
+    console.log('   taskkill /PID <PID_NUMBER> /F');
+    console.log(`   Or change PORT in .env file`);
+    process.exit(1);
+  } else {
+    console.error('❌ Server error:', err);
+  }
+});
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  console.log('\n🔄 Shutting down gracefully...');
+
+  server.close(() => {
+    console.log('✅ HTTP server closed');
+  });
+
+  try {
+    await mongoose.connection.close();
+    console.log('✅ MongoDB connection closed');
+  } catch (error) {
+    console.error('❌ Error closing MongoDB:', error);
+  }
+
+  process.exit(0);
 });
 
 module.exports = app;
