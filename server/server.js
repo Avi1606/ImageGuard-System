@@ -9,14 +9,18 @@ const authRoutes = require('./routes/auth');
 const imageRoutes = require('./routes/images');
 const watermarkRoutes = require('./routes/watermark');
 const detectionRoutes = require('./routes/detection');
-const mlDetectionRoutes = require('./routes/mlDetection'); // Add ML routes
+const mlDetectionRoutes = require('./routes/mlDetection');
 
 const app = express();
 
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: [
+    process.env.CLIENT_URL,
+    'https://your-vercel-app.vercel.app', // Replace with your actual Vercel URL
+    'http://localhost:3000' // Keep for development
+  ],
   credentials: true
 }));
 
@@ -35,7 +39,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use('/uploads', express.static('uploads'));
 
 // Database connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/imageprotection', {
+mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
@@ -53,7 +57,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/images', imageRoutes);
 app.use('/api/watermark', watermarkRoutes);
 app.use('/api/detection', detectionRoutes);
-app.use('/api/ml-detection', mlDetectionRoutes); // Add ML detection routes
+app.use('/api/ml-detection', mlDetectionRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -99,10 +103,10 @@ app.use('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log('🧠 Python ML integration enabled');
-  console.log('🔗 Test Python: http://localhost:${PORT}/test-python');
+  console.log(`🔗 Test Python: http://localhost:${PORT}/test-python`);
 });
 
 module.exports = app;
