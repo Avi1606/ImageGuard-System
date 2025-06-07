@@ -4,9 +4,7 @@ ImageGuard is a full-stack web application designed to help users protect their 
 
 ## Live Demo
 
-[![ImageGuard Demo Video](https://youtu.be/I14iG5RyOXw)]
-
-*Note: The video above is a placeholder. You should replace the link with a URL to your own demo video hosted on a service like YouTube or Loom.*
+[Watch the Project Demo Video](https://youtu.be/I14iG5RyOXw)
 
 ## Table of Contents
 
