@@ -12,6 +12,7 @@ const detectionRoutes = require('./routes/detection');
 const mlDetectionRoutes = require('./routes/mlDetection');
 
 const app = express();
+app.set('trust proxy', 1);
 
 // Security middleware
 app.use(helmet());
