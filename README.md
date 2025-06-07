@@ -2,6 +2,12 @@
 
 ImageGuard is a full-stack web application designed to help users protect their images through watermarking and to detect unauthorized usage or tampering through advanced image analysis, including both perceptual hashing and machine learning-based feature extraction.
 
+## Live Demo
+
+[![ImageGuard Demo Video](https://youtu.be/I14iG5RyOXw)]
+
+*Note: The video above is a placeholder. You should replace the link with a URL to your own demo video hosted on a service like YouTube or Loom.*
+
 ## Table of Contents
 
 - [Features](#features)
@@ -99,9 +105,12 @@ cd <project-directory>
   pip install -r requirements.txt
   ```
 
-- **Create a `.env` file** in the `server` directory and add your environment variables, such as your MongoDB connection string:
+- **Create a `.env` file** in the `server` directory. You will need to add your own MongoDB connection string and a JWT secret for the application to work.
   ```
+  # Replace with your own MongoDB connection string
   MONGODB_URI=<your_mongodb_connection_string>
+  
+  # Replace with a long, random string for JWT
   JWT_SECRET=<your_jwt_secret>
   ```
 
