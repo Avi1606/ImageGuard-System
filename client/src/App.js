@@ -16,7 +16,7 @@ import Gallery from './pages/Gallery';
 import ImageDetail from './pages/ImageDetail';
 import Watermark from './pages/Watermark';
 import Detection from './pages/Detection';
-import MLDetection from './pages/MLDetection'; // Add ML Detection
+import MLDetection from './pages/MLDetection';
 import Profile from './pages/Profile';
 import Analytics from './pages/Analytics';
 

@@ -33,8 +33,7 @@ const Navbar = () => {
     { name: 'Upload', href: '/upload', icon: Upload },
     { name: 'Gallery', href: '/gallery', icon: ImageIcon },
     { name: 'Watermark', href: '/watermark', icon: Shield },
-    { name: 'Detection', href: '/detection', icon: Eye },
-    { name: 'ML Detection', href: '/ml-detection', icon: Brain }, // Add ML Detection
+    { name: 'ML Detection', href: '/ml-detection', icon: Brain },
   ] : [];
 
   return (

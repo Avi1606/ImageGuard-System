@@ -9,17 +9,29 @@ class ImageProcessor {
   // Generate perceptual hashes for image comparison
   static async generateHashes(imagePath) {
     try {
-      const image = await Jimp.read(imagePath);
+      // Refactor to use sharp for performance
+      const imageBuffer = await sharp(imagePath)
+        .greyscale()
+        .resize(8, 8, { fit: 'fill' })
+        .raw()
+        .toBuffer();
+
+      let hash = '';
+      let total = 0;
+      for (let i = 0; i < imageBuffer.length; i++) {
+        total += imageBuffer[i];
+      }
+      const avg = total / imageBuffer.length;
+
+      for (let i = 0; i < imageBuffer.length; i++) {
+        hash += imageBuffer[i] > avg ? '1' : '0';
+      }
       
-      // Generate different types of hashes
-      const hashes = {
-        perceptualHash: await this.generatePerceptualHash(image),
-        dhash: await this.generateDHash(image),
-        ahash: await this.generateAHash(image),
-        phash: await this.generatePHash(image)
+      // Only return the hash needed for the detection feature
+      return {
+        perceptualHash: hash
       };
-      
-      return hashes;
+
     } catch (error) {
       throw new Error(`Error generating hashes: ${error.message}`);
     }
