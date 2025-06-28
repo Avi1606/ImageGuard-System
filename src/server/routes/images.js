@@ -3,6 +3,8 @@ const Image = require('../models/Image');
 const { auth } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const ImageProcessor = require('../utils/imageProcessor');
+const path = require('path');
+const fs = require('fs');
 
 const router = express.Router();
 
@@ -17,19 +19,31 @@ router.post('/upload', auth, upload.array('images', 10), async (req, res) => {
 
     for (const file of req.files) {
       try {
+        // Embed hidden code (LSB steganography)
+        const secretCode = 'TIMES_PROJECT_SECRET';
+        const protectedPath = await ImageProcessor.embedHiddenCode(file.path, secretCode, file.path); // Now returns PNG path
+
+        // Delete the original file if it is not PNG
+        if (!file.path.endsWith('.png')) {
+          try { fs.unlinkSync(file.path); } catch (e) { /* ignore */ }
+        }
+
+        // Get the PNG file size
+        const protectedStats = fs.statSync(protectedPath);
+
         // Extract metadata
-        const metadata = await ImageProcessor.extractMetadata(file.path);
+        const metadata = await ImageProcessor.extractMetadata(protectedPath);
         
         // Generate hashes
-        const hashes = await ImageProcessor.generateHashes(file.path);
+        const hashes = await ImageProcessor.generateHashes(protectedPath);
 
         // Create image record
         const image = new Image({
-          filename: file.filename,
+          filename: path.basename(protectedPath),
           originalName: file.originalname,
-          path: file.path,
-          size: file.size,
-          mimetype: file.mimetype,
+          path: protectedPath,
+          size: protectedStats.size,
+          mimetype: 'image/png', // Always PNG now
           dimensions: {
             width: metadata.width,
             height: metadata.height
@@ -40,7 +54,11 @@ router.post('/upload', auth, upload.array('images', 10), async (req, res) => {
             format: metadata.format,
             exif: metadata.exif
           },
-          status: 'uploaded'
+          status: 'protected', // Set to protected
+          watermark: {
+            isWatermarked: true,
+            watermarkText: secretCode
+          }
         });
 
         await image.save();
@@ -187,7 +205,6 @@ router.delete('/:id', auth, async (req, res) => {
     }
 
     // Delete physical files
-    const fs = require('fs');
     try {
       if (fs.existsSync(image.path)) {
         fs.unlinkSync(image.path);

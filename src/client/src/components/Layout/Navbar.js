@@ -12,7 +12,8 @@ import {
   Image as ImageIcon,
   Eye,
   BarChart3,
-  Brain
+  Brain,
+  Search
 } from 'lucide-react';
 
 const Navbar = () => {
@@ -32,8 +33,7 @@ const Navbar = () => {
     { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
     { name: 'Upload', href: '/upload', icon: Upload },
     { name: 'Gallery', href: '/gallery', icon: ImageIcon },
-    { name: 'Watermark', href: '/watermark', icon: Shield },
-    { name: 'ML Detection', href: '/ml-detection', icon: Brain },
+    { name: 'Detection', href: '/detection', icon: Search },
   ] : [];
 
   return (

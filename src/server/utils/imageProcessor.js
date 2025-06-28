@@ -276,6 +276,78 @@ class ImageProcessor {
     }
     return result;
   }
+
+  // Embed a hidden code into the image using LSB steganography (fixed length, padded)
+  static async embedHiddenCode(imagePath, code, outputPath) {
+    try {
+      const image = await Jimp.read(imagePath);
+      const FIXED_LENGTH = 20; // Adjust as needed
+      let paddedCode = code.padEnd(FIXED_LENGTH, '#');
+      const codeBits = paddedCode.split('').map(c => c.charCodeAt(0).toString(2).padStart(8, '0')).join('');
+      let bitIndex = 0;
+      let finished = false;
+      
+      image.scan(0, 0, image.bitmap.width, image.bitmap.height, function (x, y, idx) {
+        if (finished) return;
+        for (let colorOffset = 0; colorOffset < 3; colorOffset++) { // R, G, B
+          if (bitIndex < codeBits.length) {
+            let colorValue = this.bitmap.data[idx + colorOffset];
+            colorValue = (colorValue & 0xFE) | parseInt(codeBits[bitIndex]);
+            this.bitmap.data[idx + colorOffset] = colorValue;
+            bitIndex++;
+          } else {
+            finished = true;
+            break;
+          }
+        }
+      });
+      // Always save as PNG for lossless embedding
+      const pngOutputPath = outputPath.replace(/\.[^.]+$/, '.png');
+      await image.writeAsync(pngOutputPath);
+      return pngOutputPath;
+    } catch (error) {
+      throw new Error(`Error embedding hidden code: ${error.message}`);
+    }
+  }
+
+  // Extract a hidden code from the image using LSB steganography (fixed length, padded)
+  static async extractHiddenCode(imagePath, codeLength) {
+    try {
+      const image = await Jimp.read(imagePath);
+      const FIXED_LENGTH = 20; // Must match embed
+      let bits = '';
+      let bitIndex = 0;
+      const totalBits = FIXED_LENGTH * 8;
+      let finished = false;
+      
+      image.scan(0, 0, image.bitmap.width, image.bitmap.height, function (x, y, idx) {
+        if (finished) return;
+        for (let colorOffset = 0; colorOffset < 3; colorOffset++) {
+          if (bitIndex < totalBits) {
+            const colorValue = this.bitmap.data[idx + colorOffset];
+            bits += (colorValue & 1).toString();
+            bitIndex++;
+          } else {
+            finished = true;
+            break;
+          }
+        }
+      });
+      // Convert bits to string
+      let code = '';
+      for (let i = 0; i < bits.length; i += 8) {
+        const byte = bits.slice(i, i + 8);
+        code += String.fromCharCode(parseInt(byte, 2));
+      }
+      console.log('[extractHiddenCode] file:', imagePath);
+      console.log('[extractHiddenCode] raw bits:', bits);
+      console.log('[extractHiddenCode] code before padding removal:', code);
+      console.log('[extractHiddenCode] code after padding removal:', code.replace(/#+$/, ''));
+      return code.replace(/#+$/, ''); // Remove padding
+    } catch (error) {
+      throw new Error(`Error extracting hidden code: ${error.message}`);
+    }
+  }
 }
 
 module.exports = ImageProcessor;

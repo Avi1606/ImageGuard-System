@@ -1,10 +1,7 @@
-# ImageGuard - Image Protection and Tampering Detection System
+# ImageGuard - Image Protection and Detection System
 
-ImageGuard is a full-stack web application designed to help users protect their images through watermarking and to detect unauthorized usage or tampering through advanced image analysis, including both perceptual hashing and machine learning-based feature extraction.
+ImageGuard is a full-stack web application designed to help users protect their images through invisible watermarking and detect unauthorized usage through advanced perceptual hashing and similarity analysis.
 
-## Live Demo
-
-[Watch the Project Demo Video](https://youtu.be/I14iG5RyOXw)
 
 ## Table of Contents
 
@@ -19,12 +16,12 @@ ImageGuard is a full-stack web application designed to help users protect their 
 ## Features
 
 - **User Authentication:** Secure user registration and login system.
-- **Image Uploading:** Users can upload their images to be protected.
-- **Watermarking:** Add visible watermarks to images with customizable text, position, and opacity.
-- **Image Hashing:** Generates multiple perceptual hashes for each uploaded image to facilitate fast and effective similarity searches.
-- **ML-Based Tampering Detection:** Utilizes a Python backend with OpenCV and scikit-learn to perform deep analysis of images, identify similarities, and provide a "tamper score".
-- **User Dashboard:** A central hub for users to view statistics, such as the number of protected images, and to access key features.
-- **Image Gallery:** A dedicated space for users to view and manage their uploaded and protected images.
+- **Automatic Image Protection:** Images are automatically protected with invisible watermarks upon upload using LSB (Least Significant Bit) steganography.
+- **Perceptual Hashing:** Generates perceptual hashes for each uploaded image to enable robust similarity detection.
+- **Smart Detection System:** Uses perceptual hash similarity to detect if an uploaded image is a copy or variant of any protected image (even if resized, compressed, or slightly modified).
+- **User Dashboard:** A central hub for users to view statistics and access key features.
+- **Image Gallery:** View and download protected images with preview functionality.
+- **Robust Detection:** Can identify "ours" vs "not ours" images with high accuracy, even for modified copies.
 
 ---
 
@@ -32,16 +29,16 @@ ImageGuard is a full-stack web application designed to help users protect their 
 
 ### Backend
 - **Node.js** with **Express.js**: For the main server logic and API.
-- **Python** with **Flask**: For the machine learning microservice.
 - **MongoDB**: As the primary database for storing user and image data.
 - **Mongoose**: As the ODM for interacting with MongoDB.
 - **JSON Web Tokens (JWT)**: For securing the API and managing user sessions.
-- **OpenCV, scikit-learn, numpy**: For image processing and machine learning tasks in the Python service.
+- **Jimp**: For image processing and LSB steganography.
+- **Sharp**: For image metadata extraction and hash generation.
 
 ### Frontend
 - **React.js**: For building the user interface.
 - **Axios**: For making API requests to the backend.
-- **Tailwind CSS**: for styling the application.
+- **Tailwind CSS**: For styling the application.
 - **React Router**: For handling client-side routing.
 
 ---
@@ -60,14 +57,12 @@ The project is organized into two main parts: a `client` directory for the front
 |       |-- pages/
 |   |-- package.json
 |
-|-- server/         # Node.js and Python backend
+|-- server/         # Node.js backend
 |   |-- middleware/
-|   |-- ml_models/  # Contains the Python ML service
 |   |-- models/
 |   |-- routes/
 |   |-- utils/
 |   |-- package.json
-|   |-- requirements.txt
 |
 |-- .gitignore
 |-- README.md
@@ -77,7 +72,7 @@ The project is organized into two main parts: a `client` directory for the front
 
 ## Local Development Setup
 
-To run this project locally, you will need to have Node.js, npm, and Python installed on your machine.
+To run this project locally, you will need to have Node.js and npm installed on your machine.
 
 ### 1. Clone the Repository
 
@@ -98,11 +93,6 @@ cd <project-directory>
   npm install
   ```
 
-- **Install Python dependencies:**
-  ```bash
-  pip install -r requirements.txt
-  ```
-
 - **Create a `.env` file** in the `server` directory. You will need to add your own MongoDB connection string and a JWT secret for the application to work.
   ```
   # Replace with your own MongoDB connection string
@@ -112,11 +102,11 @@ cd <project-directory>
   JWT_SECRET=<your_jwt_secret>
   ```
 
-- **Start the backend server:** (This will run both the Node.js and Python services)
+- **Start the backend server:**
   ```bash
   npm run dev
   ```
-The backend will be running on `http://localhost:5000` and the Python ML service on `http://localhost:5001`.
+The backend will be running on `http://localhost:5000`.
 
 ### 3. Set Up the Frontend
 
@@ -142,8 +132,21 @@ The frontend application will open in your browser at `http://localhost:3000`.
 ## Usage
 
 Once both the backend and frontend are running, you can:
-1.  **Register** for a new account or **Login** with existing credentials.
-2.  **Upload** images you wish to protect.
-3.  Go to the **Watermark** page to apply watermarks to your images.
-4.  Use the **ML Detection** feature to check if an image has been tampered with or matches any of your protected images.
-5.  View your protected images in the **Gallery**. 
+
+1. **Register** for a new account or **Login** with existing credentials.
+2. **Upload** images you wish to protect - they are automatically protected with invisible watermarks.
+3. **Use the Detection feature** to check if an uploaded image is a copy or variant of any of your protected images.
+4. **View your protected images** in the Gallery and download them as needed.
+5. **Monitor your protection statistics** in the Dashboard.
+
+### How It Works
+
+- **Upload:** When you upload an image, the system automatically embeds an invisible watermark using LSB steganography and saves it as a PNG file.
+- **Detection:** When you upload an image for detection, the system compares its perceptual hash to all protected images in the database. If the similarity is above 90%, it's recognized as "ours."
+- **Protection:** The invisible watermark and perceptual hashing work together to provide robust protection against unauthorized usage.
+
+### Key Features
+
+- **Invisible Protection:** Images are protected without visible watermarks, maintaining their original appearance.
+- **Robust Detection:** Can detect copies even if they've been resized, compressed, or slightly modified.
+- **Simple Interface:** Easy-to-use upload and detection system with clear "ours" vs "not ours" results. 

@@ -20,25 +20,27 @@ router.post('/check', auth, upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'No image provided' });
     }
 
-    // Generate hashes for uploaded image
+    // Generate perceptual hash for uploaded image
     const suspectedHashes = await ImageProcessor.generateHashes(req.file.path);
-    
-    // Find similar images in database
-    const userImages = await Image.find({ owner: req.user.id });
-    const results = [];
+    const suspectedHash = suspectedHashes.perceptualHash;
 
-    for (const originalImage of userImages) {
-      const similarity = ImageProcessor.compareImages(
-        originalImage.hash.perceptualHash,
-        suspectedHashes.perceptualHash
-      );
+    // Find all protected images in the database
+    const protectedImages = await Image.find({ status: 'protected' });
+    let isOurs = false;
+    let bestSimilarity = 0;
+    let bestImage = null;
 
-      if (similarity > 0.8) { // 80% similarity threshold
-        results.push({
-          originalImage: originalImage._id,
-          similarity,
-          verdict: similarity > 0.95 ? 'original' : 'modified'
-        });
+    for (const originalImage of protectedImages) {
+      const originalHash = originalImage.hash?.perceptualHash;
+      if (!originalHash) continue;
+      const similarity = ImageProcessor.compareImages(originalHash, suspectedHash);
+      if (similarity > bestSimilarity) {
+        bestSimilarity = similarity;
+        bestImage = originalImage;
+      }
+      if (similarity >= 0.9) {
+        isOurs = true;
+        break;
       }
     }
 
@@ -46,10 +48,17 @@ router.post('/check', auth, upload.single('image'), async (req, res) => {
     const fs = require('fs');
     fs.unlinkSync(req.file.path);
 
-    res.json({
-      results,
-      message: results.length > 0 ? 'Similar images found' : 'No matches found'
-    });
+    if (isOurs) {
+      return res.json({
+        results: [{ verdict: 'ours', message: 'This image is visually similar to a protected image.' }],
+        message: 'This image is ours.'
+      });
+    } else {
+      return res.json({
+        results: [{ verdict: 'not_ours', message: 'This image is NOT visually similar to any protected image.' }],
+        message: 'This image is NOT ours.'
+      });
+    }
 
   } catch (error) {
     console.error('Detection error:', error);

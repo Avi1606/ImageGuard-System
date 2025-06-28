@@ -91,32 +91,17 @@ const Detection = () => {
                 {/* Results */}
                 {results.length > 0 && (
                     <div className="bg-white rounded-lg shadow p-6">
-                        <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                            Detection Results
-                        </h2>
-                        <div className="space-y-4">
-                            {results.map((result, index) => (
-                                <div key={index} className="border border-gray-200 rounded-lg p-4">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center space-x-3">
-                                            {result.verdict === 'original' ? (
-                                                <CheckCircle className="h-6 w-6 text-green-500" />
-                                            ) : (
-                                                <AlertTriangle className="h-6 w-6 text-yellow-500" />
-                                            )}
-                                            <div>
-                                                <p className="font-medium text-gray-900">
-                                                    Similarity: {(result.similarity * 100).toFixed(1)}%
-                                                </p>
-                                                <p className="text-sm text-gray-600">
-                                                    Verdict: {result.verdict}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                        {results[0].verdict === 'ours' ? (
+                            <div className="flex items-center space-x-3">
+                                <CheckCircle className="h-8 w-8 text-green-500" />
+                                <span className="text-2xl font-bold text-green-700">This image is ours!</span>
+                            </div>
+                        ) : (
+                            <div className="flex items-center space-x-3">
+                                <AlertTriangle className="h-8 w-8 text-red-500" />
+                                <span className="text-2xl font-bold text-red-700">This image is NOT ours.</span>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

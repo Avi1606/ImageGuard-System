@@ -27,6 +27,7 @@ const Gallery = () => {
     const [pagination, setPagination] = useState({ current: 1, pages: 1, total: 0 });
     const [indexingStates, setIndexingStates] = useState({});
     const [bulkIndexing, setBulkIndexing] = useState(false);
+    const [previewImage, setPreviewImage] = useState(null);
 
     useEffect(() => {
         fetchImages();
@@ -63,82 +64,8 @@ const Gallery = () => {
         setPagination(prev => ({ ...prev, current: 1 }));
     };
 
-    const addToMLIndex = async (imageId) => {
-        setIndexingStates(prev => ({ ...prev, [imageId]: true }));
-
-        try {
-            const response = await axios.post(`/api/ml-detection/add-to-index/${imageId}`);
-
-            if (response.data.success) {
-                if (response.data.alreadyIndexed) {
-                    toast.info('Image was already in ML index');
-                } else {
-                    toast.success('Image added to ML index successfully!');
-                }
-
-                // Update the image status in the local state
-                setImages(prev => prev.map(img =>
-                    img._id === imageId ? {
-                        ...img,
-                        status: 'indexed',
-                        mlIndex: {
-                            isIndexed: true,
-                            indexedAt: new Date(),
-                            searchableHash: response.data.searchableHash || 'generated'
-                        }
-                    } : img
-                ));
-            }
-        } catch (error) {
-            console.error('Error adding to index:', error);
-            const errorMessage = error.response?.data?.details || error.response?.data?.error || 'Failed to add to ML index';
-            toast.error(errorMessage);
-        } finally {
-            setIndexingStates(prev => ({ ...prev, [imageId]: false }));
-        }
-    };
-
-    const bulkAddToIndex = async () => {
-        const unindexedImages = images.filter(img =>
-            !img.mlIndex?.isIndexed && img.status !== 'indexed'
-        );
-
-        if (unindexedImages.length === 0) {
-            toast.info('All visible images are already indexed');
-            return;
-        }
-
-        setBulkIndexing(true);
-
-        try {
-            const imageIds = unindexedImages.map(img => img._id);
-            const response = await axios.post('/api/ml-detection/bulk-index', { imageIds });
-
-            if (response.data.success) {
-                toast.success(`Successfully indexed ${response.data.summary.successful} images`);
-
-                if (response.data.summary.errors > 0) {
-                    toast.error(`Failed to index ${response.data.summary.errors} images`);
-                }
-
-                // Refresh the images
-                fetchImages();
-            }
-        } catch (error) {
-            console.error('Bulk indexing error:', error);
-            toast.error('Bulk indexing failed');
-        } finally {
-            setBulkIndexing(false);
-        }
-    };
-
-    const isImageIndexed = (image) => {
-        return image.mlIndex?.isIndexed || image.status === 'indexed';
-    };
-
     const getStatusColor = (image) => {
         if (image.status === 'protected') return 'bg-green-100 text-green-800';
-        if (isImageIndexed(image)) return 'bg-purple-100 text-purple-800';
         if (image.status === 'uploaded') return 'bg-yellow-100 text-yellow-800';
         if (image.status === 'processing') return 'bg-blue-100 text-blue-800';
         return 'bg-gray-100 text-gray-800';
@@ -146,11 +73,9 @@ const Gallery = () => {
 
     const getImageStats = () => {
         const total = images.length;
-        const indexed = images.filter(isImageIndexed).length;
         const watermarked = images.filter(img => img.watermark?.isWatermarked).length;
-        const unindexed = total - indexed;
 
-        return { total, indexed, watermarked, unindexed };
+        return { total, watermarked };
     };
 
     if (loading && images.length === 0) {
@@ -178,16 +103,8 @@ const Gallery = () => {
                             <div className="text-sm text-gray-600">Total Images</div>
                         </div>
                         <div className="bg-white rounded-lg shadow p-4 text-center">
-                            <div className="text-2xl font-bold text-purple-600">{stats.indexed}</div>
-                            <div className="text-sm text-gray-600">ML Indexed</div>
-                        </div>
-                        <div className="bg-white rounded-lg shadow p-4 text-center">
                             <div className="text-2xl font-bold text-green-600">{stats.watermarked}</div>
                             <div className="text-sm text-gray-600">Watermarked</div>
-                        </div>
-                        <div className="bg-white rounded-lg shadow p-4 text-center">
-                            <div className="text-2xl font-bold text-yellow-600">{stats.unindexed}</div>
-                            <div className="text-sm text-gray-600">Not Indexed</div>
                         </div>
                     </div>
                 )}
@@ -209,31 +126,6 @@ const Gallery = () => {
 
                         {/* Actions and Filters */}
                         <div className="flex items-center space-x-4">
-                            {/* Bulk Index Button */}
-                            {stats.unindexed > 0 && (
-                                <button
-                                    onClick={bulkAddToIndex}
-                                    disabled={bulkIndexing}
-                                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                                        bulkIndexing
-                                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                            : 'bg-purple-600 text-white hover:bg-purple-700'
-                                    }`}
-                                >
-                                    {bulkIndexing ? (
-                                        <>
-                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                            <span>Indexing...</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Brain className="h-4 w-4" />
-                                            <span>Index All ({stats.unindexed})</span>
-                                        </>
-                                    )}
-                                </button>
-                            )}
-
                             {/* Filter Dropdown */}
                             <select
                                 value={filterStatus}
@@ -242,7 +134,6 @@ const Gallery = () => {
                             >
                                 <option value="all">All Status</option>
                                 <option value="uploaded">Uploaded Only</option>
-                                <option value="indexed">ML Indexed</option>
                                 <option value="protected">Watermarked</option>
                                 <option value="processing">Processing</option>
                             </select>
@@ -293,11 +184,6 @@ const Gallery = () => {
                                                         <Shield className="h-3 w-3" />
                                                     </div>
                                                 )}
-                                                {isImageIndexed(image) && (
-                                                    <div className="bg-purple-500 text-white p-1 rounded" title="ML Indexed">
-                                                        <Brain className="h-3 w-3" />
-                                                    </div>
-                                                )}
                                             </div>
 
                                             {/* Processing Indicator */}
@@ -319,40 +205,10 @@ const Gallery = () => {
                                                 {new Date(image.createdAt).toLocaleDateString()}
                                             </p>
 
-                                            {/* ML Index Date */}
-                                            {isImageIndexed(image) && image.mlIndex?.indexedAt && (
-                                                <p className="text-xs text-purple-600 mt-1">
-                                                    Indexed: {new Date(image.mlIndex.indexedAt).toLocaleDateString()}
-                                                </p>
-                                            )}
-
                                             <div className="flex items-center justify-between mt-3">
                         <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(image)}`}>
                           {image.status}
                         </span>
-                                                <div className="flex space-x-2">
-                                                    {!isImageIndexed(image) && (
-                                                        <button
-                                                            onClick={() => addToMLIndex(image._id)}
-                                                            disabled={indexingStates[image._id]}
-                                                            className="text-purple-600 hover:text-purple-800 disabled:text-gray-400"
-                                                            title="Add to ML Index"
-                                                        >
-                                                            {indexingStates[image._id] ? (
-                                                                <div className="animate-spin h-4 w-4 border-2 border-purple-600 border-t-transparent rounded-full"></div>
-                                                            ) : (
-                                                                <Plus className="h-4 w-4" />
-                                                            )}
-                                                        </button>
-                                                    )}
-                                                    <Link
-                                                        to={`/image/${image._id}`}
-                                                        className="text-blue-600 hover:text-blue-800"
-                                                        title="View Details"
-                                                    >
-                                                        <Eye className="h-4 w-4" />
-                                                    </Link>
-                                                </div>
                                             </div>
                                         </div>
                                     </>
@@ -370,9 +226,6 @@ const Gallery = () => {
                                                 {image.watermark?.isWatermarked && (
                                                     <Shield className="h-3 w-3 text-green-600" />
                                                 )}
-                                                {isImageIndexed(image) && (
-                                                    <Brain className="h-3 w-3 text-purple-600" />
-                                                )}
                                             </div>
                                         </div>
 
@@ -381,11 +234,6 @@ const Gallery = () => {
                                             <p className="text-sm text-gray-600">
                                                 Uploaded: {new Date(image.createdAt).toLocaleDateString()}
                                             </p>
-                                            {isImageIndexed(image) && image.mlIndex?.indexedAt && (
-                                                <p className="text-xs text-purple-600">
-                                                    Indexed: {new Date(image.mlIndex.indexedAt).toLocaleDateString()}
-                                                </p>
-                                            )}
                                             <p className="text-xs text-gray-500">
                                                 {image.dimensions?.width}×{image.dimensions?.height} • {(image.size / 1024 / 1024).toFixed(2)} MB
                                             </p>
@@ -395,35 +243,24 @@ const Gallery = () => {
                       <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(image)}`}>
                         {image.status}
                       </span>
-
-                                            <div className="flex space-x-2">
-                                                {!isImageIndexed(image) && (
-                                                    <button
-                                                        onClick={() => addToMLIndex(image._id)}
-                                                        disabled={indexingStates[image._id]}
-                                                        className="flex items-center space-x-1 text-purple-600 hover:text-purple-800 disabled:text-gray-400 text-sm"
-                                                        title="Add to ML Index"
-                                                    >
-                                                        {indexingStates[image._id] ? (
-                                                            <div className="animate-spin h-4 w-4 border-2 border-purple-600 border-t-transparent rounded-full"></div>
-                                                        ) : (
-                                                            <>
-                                                                <Plus className="h-4 w-4" />
-                                                                <span>Index</span>
-                                                            </>
-                                                        )}
-                                                    </button>
-                                                )}
-                                                <Link
-                                                    to={`/image/${image._id}`}
-                                                    className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                                                >
-                                                    View Details
-                                                </Link>
-                                            </div>
                                         </div>
                                     </div>
                                 )}
+                                <div className="flex space-x-2 mt-2">
+                                    <button
+                                        className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm"
+                                        onClick={() => setPreviewImage(`/${image.path}`)}
+                                    >
+                                        View Protected Image
+                                    </button>
+                                    <a
+                                        href={`/${image.path}`}
+                                        download
+                                        className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm"
+                                    >
+                                        Download
+                                    </a>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -506,25 +343,22 @@ const Gallery = () => {
                         </nav>
                     </div>
                 )}
-
-                {/* Help Text */}
-                {images.length > 0 && stats.unindexed > 0 && (
-                    <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <div className="flex items-start space-x-3">
-                            <Brain className="h-5 w-5 text-blue-600 mt-0.5" />
-                            <div className="text-sm">
-                                <p className="text-blue-800 font-medium">
-                                    ML Detection Tip
-                                </p>
-                                <p className="text-blue-700 mt-1">
-                                    You have {stats.unindexed} image(s) not yet indexed for ML detection.
-                                    Index them to enable unauthorized usage detection and similarity matching.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                )}
             </div>
+
+            {/* Modal for image preview */}
+            {previewImage && (
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-lg p-4 max-w-lg w-full relative">
+                        <button
+                            className="absolute top-2 right-2 text-gray-500 hover:text-gray-800"
+                            onClick={() => setPreviewImage(null)}
+                        >
+                            &times;
+                        </button>
+                        <img src={previewImage} alt="Protected Preview" className="w-full h-auto rounded" />
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

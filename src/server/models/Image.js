@@ -7,8 +7,7 @@ const imageSchema = new mongoose.Schema({
   },
   filename: {
     type: String,
-    required: true,
-    unique: true
+    required: true
   },
   path: {
     type: String,
@@ -102,7 +101,6 @@ const imageSchema = new mongoose.Schema({
 
 // Index for faster queries
 imageSchema.index({ owner: 1, status: 1 });
-imageSchema.index({ filename: 1 }, { unique: true });
 imageSchema.index({ 'mlIndex.isIndexed': 1 });
 
 module.exports = mongoose.model('Image', imageSchema);
